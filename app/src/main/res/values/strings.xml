@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Victory_group_test_task</string>
+    <string name="error">Unknown error</string>
+    <string name="enable_location">Enable location</string>
+    <string name="question">Location disabled, do you want enable location?</string>
+    <string name="ok">Ok</string>
+    <string name="cancel">Cancel</string>
+
 </resources>

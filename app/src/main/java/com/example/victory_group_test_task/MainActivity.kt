@@ -1,5 +1,6 @@
 package com.example.victory_group_test_task
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -7,10 +8,12 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.victory_group_test_task.databinding.ActivityMainBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.RequestPoint
 import com.yandex.mapkit.RequestPointType
@@ -26,31 +29,34 @@ import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.map.MapObjectCollection
 import com.yandex.mapkit.mapview.MapView
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-class MainActivity : AppCompatActivity(){
+class MainActivity : AppCompatActivity() {
 
     private var binding: ActivityMainBinding? = null
-
-    private lateinit var mapView: MapView
-    private var drivingRouter : DrivingRouter? = null
+    private var mapView: MapView? = null
+    private var drivingRouter: DrivingRouter? = null
     private var drivingSession: DrivingSession? = null
     private var mapObjects: MapObjectCollection? = null
     private var drivingOptions: DrivingOptions? = null
     private var vehicleOptions: VehicleOptions? = null
+    private var fusedLocationClient: FusedLocationProviderClient? = null
+    private var currentPosition: Point? = null
+    private var job: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
 
-
         MapKitFactory.initialize(this)
-        //setContentView(R.layout.activity_main)
         mapView = binding!!.mapView
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         requestLocationPermission()
         val mapKit = MapKitFactory.getInstance()
-        mapView.mapWindow.map.move(
+        mapView!!.mapWindow.map.move(
             CameraPosition(
                 DESTINATION,
                 /* zoom = */ 17.0f,
@@ -59,8 +65,17 @@ class MainActivity : AppCompatActivity(){
             )
         )
         checkGPS()
-        val locationOnMapKit = mapKit.createUserLocationLayer(mapView.mapWindow)
+        val locationOnMapKit = mapKit.createUserLocationLayer(mapView!!.mapWindow)
         locationOnMapKit.isVisible = true
+
+        drivingRouter =
+            DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.ONLINE)
+        mapObjects = mapView!!.mapWindow.map.mapObjects.addCollection()
+
+        drivingOptions = DrivingOptions().apply {
+            routesCount = 1
+        }
+        vehicleOptions = VehicleOptions().setVehicleType(VehicleType.TAXI)
 
         buildingRoute()
     }
@@ -68,58 +83,79 @@ class MainActivity : AppCompatActivity(){
     override fun onStart() {
         super.onStart()
         MapKitFactory.getInstance().onStart()
-        mapView.onStart()
+        mapView!!.onStart()
     }
 
     override fun onStop() {
-        mapView.onStop()
+        mapView!!.onStop()
         MapKitFactory.getInstance().onStop()
         super.onStop()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        job?.cancel()
+    }
+
     private fun buildingRoute() {
-        drivingRouter = DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.ONLINE)
-        mapObjects = mapView.mapWindow.map.mapObjects.addCollection()
-
-        drivingOptions = DrivingOptions().apply {
-            routesCount = 1
-        }
-        vehicleOptions = VehicleOptions().setVehicleType(VehicleType.TAXI)
-
-        val points = buildList {
-            add(RequestPoint(Point(56.777788, 60.663415), RequestPointType.WAYPOINT, null, null))
-            add(RequestPoint(DESTINATION, RequestPointType.WAYPOINT, null, null))
-        }
-
         val drivingRouteListener = object : DrivingSession.DrivingRouteListener {
             override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
-                for(route in drivingRoutes) {
+                for (route in drivingRoutes) {
                     mapObjects!!.addPolyline(route.geometry)
                 }
             }
 
             override fun onDrivingRoutesError(p0: com.yandex.runtime.Error) {
-                val errorMessage = "Unknown error"
+                val errorMessage = getString(R.string.error)
                 Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
             }
         }
 
-        drivingSession = drivingRouter!!.requestRoutes(
-            points,
-            drivingOptions!!,
-            vehicleOptions!!,
-            drivingRouteListener
-        )
+        if (currentPosition != null) {
+            val points = buildList {
+                add(RequestPoint(currentPosition!!, RequestPointType.WAYPOINT, null, null))
+                add(RequestPoint(DESTINATION, RequestPointType.WAYPOINT, null, null))
+            }
+
+            drivingSession = drivingRouter!!.requestRoutes(
+                points,
+                drivingOptions!!,
+                vehicleOptions!!,
+                drivingRouteListener
+            )
+        }
     }
 
-    private fun requestLocationPermission(){
-        if(ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+    private fun requestLocationPermission() {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION),
-                0)
-            return
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                0
+            )
+        }
+        job = lifecycleScope.launch {
+            while (true) {
+                fusedLocationClient!!.lastLocation
+                    .addOnSuccessListener { location ->
+                        if (location != null) {
+                            currentPosition = Point(location.latitude, location.longitude)
+                        }
+                    }
+                buildingRoute()
+                delay(4000L)
+            }
         }
     }
 
@@ -128,9 +164,9 @@ class MainActivity : AppCompatActivity(){
         return lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
     }
 
-    private fun checkGPS(){
-        if(!isGPSEnabled()){
-            DialogManager.locationSettingsDialog(this, object : DialogManager.Listener{
+    private fun checkGPS() {
+        if (!isGPSEnabled()) {
+            DialogManager.locationSettingsDialog(this, object : DialogManager.Listener {
                 override fun onClick() {
                     startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 }
@@ -138,8 +174,7 @@ class MainActivity : AppCompatActivity(){
         }
     }
 
-    companion object{
+    companion object {
         private val DESTINATION = Point(56.833742, 60.635716)
     }
-
 }

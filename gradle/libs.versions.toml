@@ -10,6 +10,8 @@ material = "1.10.0"
 activity = "1.9.0"
 constraintlayout = "2.1.4"
 map = "4.6.1-navikit"
+locatoin = "21.0.1"
+corver = "1.6.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -21,6 +23,9 @@ material = { group = "com.google.android.material", name = "material", version.r
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 maps-mobile = {group = "com.yandex.android", name = "maps.mobile", version.ref = "map"}
+google-services-location = {group = "com.google.android.gms", name = "play-services-location", version.ref = "locatoin"}
+coroutines = {group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "corver"}
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

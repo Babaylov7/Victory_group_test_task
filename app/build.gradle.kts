@@ -52,7 +52,12 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    // Yandex MapKit
     implementation (libs.maps.mobile)
+    // Google services location
+    implementation(libs.google.services.location)
+    // Kotlinx coroutines
+    implementation(libs.coroutines)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
