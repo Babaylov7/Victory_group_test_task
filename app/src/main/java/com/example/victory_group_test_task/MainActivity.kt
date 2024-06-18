@@ -98,6 +98,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildingRoute() {
+
         val drivingRouteListener = object : DrivingSession.DrivingRouteListener {
             override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
                 for (route in drivingRoutes) {
@@ -153,8 +154,11 @@ class MainActivity : AppCompatActivity() {
                             currentPosition = Point(location.latitude, location.longitude)
                         }
                     }
-                buildingRoute()
-                delay(4000L)
+                if(currentPosition != null){
+                    buildingRoute()
+                    break
+                }
+                delay(DEBOUNCE)
             }
         }
     }
@@ -176,5 +180,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private val DESTINATION = Point(56.833742, 60.635716)
+        private const val DEBOUNCE = 2000L
     }
 }
