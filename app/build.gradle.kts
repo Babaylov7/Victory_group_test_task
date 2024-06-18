@@ -8,6 +8,10 @@ android {
     namespace = "com.example.victory_group_test_task"
     compileSdk = 34
 
+    buildFeatures {
+        viewBinding = true
+    }
+
     defaultConfig {
         applicationId = "com.example.victory_group_test_task"
         minSdk = 24
