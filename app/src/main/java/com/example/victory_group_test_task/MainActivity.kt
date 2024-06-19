@@ -1,6 +1,7 @@
 package com.example.victory_group_test_task
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -76,8 +77,6 @@ class MainActivity : AppCompatActivity() {
             routesCount = 1
         }
         vehicleOptions = VehicleOptions().setVehicleType(VehicleType.TAXI)
-
-        buildingRoute()
     }
 
     override fun onStart() {
@@ -93,26 +92,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         job?.cancel()
+        super.onDestroy()
     }
 
     private fun buildingRoute() {
-
         val drivingRouteListener = object : DrivingSession.DrivingRouteListener {
             override fun onDrivingRoutes(drivingRoutes: MutableList<DrivingRoute>) {
                 for (route in drivingRoutes) {
                     mapObjects!!.addPolyline(route.geometry)
                 }
             }
-
             override fun onDrivingRoutesError(p0: com.yandex.runtime.Error) {
                 val errorMessage = getString(R.string.error)
                 Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
             }
         }
-
-        if (currentPosition != null) {
             val points = buildList {
                 add(RequestPoint(currentPosition!!, RequestPointType.WAYPOINT, null, null))
                 add(RequestPoint(DESTINATION, RequestPointType.WAYPOINT, null, null))
@@ -124,19 +119,10 @@ class MainActivity : AppCompatActivity() {
                 vehicleOptions!!,
                 drivingRouteListener
             )
-        }
     }
 
     private fun requestLocationPermission() {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (checkForPermissions()) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(
@@ -146,6 +132,22 @@ class MainActivity : AppCompatActivity() {
                 0
             )
         }
+        getCurrentPosition()
+    }
+
+    private fun checkForPermissions(): Boolean {
+        return ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun getCurrentPosition() {
         job = lifecycleScope.launch {
             while (true) {
                 fusedLocationClient!!.lastLocation
@@ -154,7 +156,7 @@ class MainActivity : AppCompatActivity() {
                             currentPosition = Point(location.latitude, location.longitude)
                         }
                     }
-                if(currentPosition != null){
+                if (currentPosition != null) {
                     buildingRoute()
                     break
                 }
